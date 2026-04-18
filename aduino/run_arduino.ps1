@@ -3,7 +3,7 @@
 $ARDUINO_CLI = "C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe"
 $FQBN = "arduino:samd:nano_33_iot"
 $PORT = "COM4"
-$SKETCH = "sketch_sep11a.ino"
+$SKETCH = "aduino.ino"
 
 Write-Host "--- Step 1: Compiling Sketch: $SKETCH ---" -ForegroundColor Cyan
 & $ARDUINO_CLI compile --fqbn $FQBN $SKETCH
