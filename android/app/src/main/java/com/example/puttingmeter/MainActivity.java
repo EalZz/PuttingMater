@@ -219,7 +219,7 @@ public class MainActivity extends AppCompatActivity {
                 avgSpeedValue.setText(String.format("%.1f", displaySpeed));
                 lastAvgSpeed = rawSpeed;
 
-                double distance = PuttingDistanceCalculator.calculateDistance(lastPeakSpeed, correctionStep);
+                double distance = PuttingDistanceCalculator.calculateDistance(lastAvgSpeed, correctionStep);
                 float fDistance = (float) distance;
                 distanceValue.setText(String.format("%.1f", fDistance));
 
@@ -326,8 +326,8 @@ public class MainActivity extends AppCompatActivity {
             recordAdapter.setSpeedUnit(speedUnit);
 
             // 비거리 재계산 (정수 표기)
-            if (lastPeakSpeed > 0) {
-                double distance = PuttingDistanceCalculator.calculateDistance(lastPeakSpeed, correctionStep);
+            if (lastAvgSpeed > 0) {
+                double distance = PuttingDistanceCalculator.calculateDistance(lastAvgSpeed, correctionStep);
                 distanceValue.setText(String.format(Locale.getDefault(), "%.1f", distance));
             }
 
