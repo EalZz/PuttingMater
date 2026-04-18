@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
+import java.util.Locale;
 
 public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.RecordViewHolder> {
 
@@ -47,9 +48,7 @@ public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.RecordView
         holder.speedText.setText(String.format("피크 %.1f %s", displayPeak, speedUnit));
         holder.avgSpeedText.setText(String.format("평균 %.1f %s", displayAvg, speedUnit));
         
-        // 비거리를 10배하여 반올림한 정수로 표시
-        int distanceValueInt = (int)Math.round(record.getDistance() * 10);
-        holder.distanceText.setText(String.format("→ %d m", distanceValueInt));
+        holder.distanceText.setText(String.format(Locale.getDefault(), "→ %.1f m", record.getDistance()));
         
         holder.timeText.setText(record.getTime());
     }

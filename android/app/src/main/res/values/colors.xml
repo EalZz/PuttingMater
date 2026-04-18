@@ -7,4 +7,28 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    
+    <!-- Premium UI Colors -->
+    <color name="deep_navy">#0A192F</color>
+    <color name="deep_navy_light">#112240</color>
+    <color name="neon_blue">#00E5FF</color>
+    <color name="neon_green">#00E676</color>
+    <color name="neon_orange">#FF9100</color>
+    <color name="jackpot_gold">#FFD600</color>
+    <color name="glass_white">#1AFFFFFF</color>
+    <color name="text_secondary">#8892B0</color>
+
+    <!-- Pro Dashboard Premium Colors -->
+    <color name="pro_green_bg">#0A1D13</color>
+    <color name="pro_green_light">#0E301B</color>
+    <color name="pro_gold_accent">#DAB06D</color>
+    <color name="pro_glass_bg">#1AFFFFFF</color>
+    <color name="pro_glass_stroke">#33FFFFFF</color>
+    <color name="pro_cyan_data">#00E5FF</color>
+    <color name="pro_orange_data">#FF9100</color>
+    <color name="pro_top_glow">#0F3D1F</color>
+    
+    <!-- Glow Colors -->
+    <color name="pro_cyan_glow">#8000E5FF</color>
+    <color name="pro_orange_glow">#80FF9100</color>
 </resources>

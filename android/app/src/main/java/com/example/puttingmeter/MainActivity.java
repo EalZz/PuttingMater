@@ -34,7 +34,9 @@ public class MainActivity extends AppCompatActivity {
 
     private BLEManager bleManager;
     private TextView connectionText, speedValue, speedUnitText, distanceValue, correctionText;
-    private TextView avgSpeedValue, avgSpeedUnitText; // 평균 속도 UI
+    private TextView avgSpeedValue, avgSpeedUnitText;
+    private View layoutHome, layoutHistory, layoutSettings;
+    private float maxDistanceThisSession = 0f;
 
     private RecyclerView recordsRecyclerView;
     private RecordAdapter recordAdapter;
@@ -46,14 +48,17 @@ public class MainActivity extends AppCompatActivity {
 
     private int correctionStep = 5; // 기본값 5 (1-10 범위)
     private String speedUnit = "cm/s";
-
-    private float lastPeakSpeed = 0f; // 기록용
-    private float lastAvgSpeed = 0f;  // 기록용
+    private float lastPeakSpeed = 0f;
+    private float lastAvgSpeed = 0f;
 
     // 2초 타이머 관련 변수들
     private Handler resetHandler = new Handler(Looper.getMainLooper());
     private Runnable resetRunnable;
-    private static final long RESET_DELAY_MS = 2000; // 2초
+    private static final long RESET_DELAY_MS = 2000;
+    private static final long RECONNECT_SCAN_DELAY_MS = 1800;
+    private static final String STATE_DISCONNECTED = "Disconnected";
+    private static final String STATE_CONNECTING = "Connecting...";
+    private static final String STATE_CONNECTED = "Connected to Device";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,24 +66,42 @@ public class MainActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) getSupportActionBar().hide();
         setContentView(R.layout.activity_main);
 
+        // UI 요소 연결
         connectionText = findViewById(R.id.connectionText);
         speedValue = findViewById(R.id.speedValue);
         speedUnitText = findViewById(R.id.speedUnitText);
         distanceValue = findViewById(R.id.distanceValue);
-        correctionText = findViewById(R.id.greenSpeedText); // 기존 greenSpeedText를 재사용
+        correctionText = findViewById(R.id.greenSpeedText);
 
         avgSpeedValue = findViewById(R.id.avgSpeedValue);
         avgSpeedUnitText = findViewById(R.id.avgSpeedUnitText);
-        avgSpeedUnitText.setText(speedUnit);
+        
+        layoutHome = findViewById(R.id.layout_home);
+        layoutHistory = findViewById(R.id.layout_history);
+        layoutSettings = findViewById(R.id.layout_settings);
 
-        btnReset = findViewById(R.id.btnChart);
+        btnReset = findViewById(R.id.btnChart); // 초기화 버튼 (XML ID match)
         btnSettings = findViewById(R.id.btnSettings);
         btnReconnect = findViewById(R.id.btnReconnect);
 
+        // Bottom Navigation 설정
+        com.google.android.material.bottomnavigation.BottomNavigationView bottomNav = findViewById(R.id.bottomNav);
+        if (bottomNav != null) {
+            bottomNav.setOnItemSelectedListener(item -> {
+                int id = item.getItemId();
+                if (layoutHome != null) layoutHome.setVisibility(id == R.id.nav_home ? View.VISIBLE : View.GONE);
+                if (layoutHistory != null) layoutHistory.setVisibility(id == R.id.nav_history ? View.VISIBLE : View.GONE);
+                if (layoutSettings != null) layoutSettings.setVisibility(id == R.id.nav_settings ? View.VISIBLE : View.GONE);
+                return true;
+            });
+        }
+
         recordsRecyclerView = findViewById(R.id.recordsRecyclerView);
         recordAdapter = new RecordAdapter(recordList);
-        recordsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recordsRecyclerView.setAdapter(recordAdapter);
+        if (recordsRecyclerView != null) {
+            recordsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+            recordsRecyclerView.setAdapter(recordAdapter);
+        }
 
         // 2초 후 UI 리셋을 위한 Runnable 초기화
         resetRunnable = new Runnable() {
@@ -93,17 +116,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onConnectionStateChanged(boolean connected) {
                 runOnUiThread(() -> {
-                    connectionText.setText(connected ? "Arduino 연결됨" : "연결 끊김");
+                    setConnectionStatus(connected ? STATE_CONNECTED : STATE_DISCONNECTED);
                     View statusDot = findViewById(R.id.statusDot);
                     if (statusDot != null) {
                         statusDot.setBackgroundResource(connected ? R.drawable.status_dot_connected : R.drawable.circle_red);
                     }
-                    btnReconnect.setVisibility(connected ? View.GONE : View.VISIBLE);
-
-                    // 연결이 끊어지면 UI 값들 리셋
-                    if (!connected) {
-                        resetUIValues();
-                    }
+                    if (!connected) resetUIValues();
                 });
             }
 
@@ -123,49 +141,69 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        btnReset.setOnClickListener(v -> {
-            if (bleManager.isConnected()) {
-                bleManager.sendResetCommand();
-                recordList.clear();
-                recordAdapter.notifyDataSetChanged();
-                resetUIValues();
-            }
-            else startBLEScan();
-        });
+        if (btnReset != null) {
+            btnReset.setOnClickListener(v -> {
+                if (bleManager.isConnected()) {
+                    bleManager.sendResetCommand();
+                    recordList.clear();
+                    recordAdapter.notifyDataSetChanged();
+                    maxDistanceThisSession = 0f;
+                    resetUIValues();
+                } else startBLEScanAction();
+            });
+        }
 
-        btnSettings.setOnClickListener(v -> showSettingsDialog());
-        btnReconnect.setOnClickListener(v -> startBLEScan());
-        btnReconnect.setVisibility(View.GONE);
+        if (btnSettings != null) btnSettings.setOnClickListener(v -> showSettingsDialog());
+        if (btnReconnect != null) btnReconnect.setOnClickListener(v -> requestBoardRebootAndReconnect());
 
         checkAndRequestPermissions();
 
-        // 초기 단위 표시
-        speedUnitText.setText(speedUnit);
-        avgSpeedUnitText.setText(speedUnit);
-        recordAdapter.setSpeedUnit(speedUnit);
-
-        // 초기 보정 단계 표시
+        // 초기 설정
+        speedUnit = "cm/s";
+        if (speedUnitText != null) speedUnitText.setText(speedUnit);
+        if (avgSpeedUnitText != null) avgSpeedUnitText.setText(speedUnit);
+        if (recordAdapter != null) recordAdapter.setSpeedUnit(speedUnit);
         updateCorrectionText(correctionStep);
     }
 
-    /**
-     * UI 값들을 0으로 리셋
-     */
+    private void startBLEScanAction() {
+        setConnectionStatus(STATE_CONNECTING);
+        if (bleManager.hasPermissions()) {
+            bleManager.startScan();
+        } else {
+            checkAndRequestPermissions();
+        }
+    }
+
+    private void requestBoardRebootAndReconnect() {
+        if (bleManager == null) return;
+
+        if (bleManager.isConnected()) {
+            bleManager.sendRebootCommand();
+            bleManager.disconnect();
+            resetHandler.postDelayed(this::startBLEScanAction, RECONNECT_SCAN_DELAY_MS);
+        } else {
+            startBLEScanAction();
+        }
+    }
+
+    private void setConnectionStatus(String status) {
+        if (connectionText != null) {
+            connectionText.setText(status);
+        }
+    }
+
+    private void startResetTimer() {
+        resetHandler.removeCallbacks(resetRunnable);
+        resetHandler.postDelayed(resetRunnable, RESET_DELAY_MS);
+    }
+
     private void resetUIValues() {
         speedValue.setText("0.0");
         avgSpeedValue.setText("0.0");
-        distanceValue.setText("0"); // 정수 형태로 표시
-        Log.d(TAG, "2초 동안 입력값이 없어 UI 값들을 0으로 리셋");
-    }
-
-    /**
-     * 2초 타이머 시작
-     */
-    private void startResetTimer() {
-        // 기존 타이머 제거
-        resetHandler.removeCallbacks(resetRunnable);
-        // 새로운 타이머 시작
-        resetHandler.postDelayed(resetRunnable, RESET_DELAY_MS);
+        distanceValue.setText("0.0");
+        distanceValue.setTextColor(getResources().getColor(R.color.neon_orange)); // 색상 복구
+        Log.d(TAG, "데이터 리셋 완료");
     }
 
     private void handleSpeedData(String data, boolean isAverage) {
@@ -181,36 +219,35 @@ public class MainActivity extends AppCompatActivity {
                 avgSpeedValue.setText(String.format("%.1f", displaySpeed));
                 lastAvgSpeed = rawSpeed;
 
-                // 새로운 물리 기반 비거리 계산
-                double distance = PuttingDistanceCalculator.calculateDistance(rawSpeed, correctionStep);
-                int distanceValueInt = (int)Math.round(distance); // 정수로 반올림 출력
-                distanceValue.setText(String.valueOf(distanceValueInt));
-                Log.d("비거리", "거리(m): " + distance + ", 표기(정수): " + distanceValueInt);
+                double distance = PuttingDistanceCalculator.calculateDistance(lastPeakSpeed, correctionStep);
+                float fDistance = (float) distance;
+                distanceValue.setText(String.format("%.1f", fDistance));
 
-                // 디버그 로그
-                PuttingDistanceCalculator.debugCalculation(rawSpeed, correctionStep);
+                // 최고 기록(Jackpot) 연출
+                if (fDistance > maxDistanceThisSession && fDistance > 0.1f) {
+                    maxDistanceThisSession = fDistance;
+                    distanceValue.setTextColor(getResources().getColor(R.color.jackpot_gold));
+                    // 햅틱 피드백 추가 가능
+                } else {
+                    distanceValue.setTextColor(getResources().getColor(R.color.neon_orange));
+                }
 
-                // 기록 추가 (평균 기준)
+                // 기록 추가
                 String now = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
-                recordList.add(0, new PuttingRecord(now, lastPeakSpeed, lastAvgSpeed, (float) distance));
-                if (recordList.size() > 5) recordList.remove(recordList.size() - 1);
+                recordList.add(0, new PuttingRecord(now, lastPeakSpeed, lastAvgSpeed, fDistance));
+                if (recordList.size() > 10) recordList.remove(recordList.size() - 1);
                 recordAdapter.notifyDataSetChanged();
-
-            }
-            else {
+            } else {
                 speedValue.setText(String.format("%.1f", displaySpeed));
                 lastPeakSpeed = rawSpeed;
             }
-
-            // 데이터 수신 시마다 2초 타이머 재시작
             startResetTimer();
-
-            Log.d(TAG, (isAverage ? "Average" : "Peak") + " Speed: " + rawSpeed);
-        }
-        catch (NumberFormatException e) {
+        } catch (NumberFormatException e) {
             Log.e(TAG, "속도 변환 오류", e);
         }
     }
+    // ... 나머지 기존 메서드들 유지 (showSettingsDialog 등) ...
+
 
     private void showSettingsDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -289,9 +326,9 @@ public class MainActivity extends AppCompatActivity {
             recordAdapter.setSpeedUnit(speedUnit);
 
             // 비거리 재계산 (정수 표기)
-            if (lastAvgSpeed > 0) {
-                double distance = PuttingDistanceCalculator.calculateDistance(lastAvgSpeed, correctionStep);
-                distanceValue.setText(String.valueOf((int)Math.round(distance)));
+            if (lastPeakSpeed > 0) {
+                double distance = PuttingDistanceCalculator.calculateDistance(lastPeakSpeed, correctionStep);
+                distanceValue.setText(String.format(Locale.getDefault(), "%.1f", distance));
             }
 
             dialog.dismiss();
@@ -317,20 +354,36 @@ public class MainActivity extends AppCompatActivity {
         else startBLEScan();
     }
 
-    private void startBLEScan() {
-        Log.d(TAG, "BLE 스캔 시작");
-        bleManager.startScan();
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        boolean granted = true;
-        for (int result : grantResults) if (result != PackageManager.PERMISSION_GRANTED) granted = false;
-        if (granted) startBLEScan();
-        else Log.e(TAG, "권한이 허용되지 않음");
+        if (requestCode == 1) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+
+            if (allGranted) {
+                Log.d(TAG, "모든 권한 허용됨 - 스캔 시작");
+                startBLEScan();
+            } else {
+                Log.e(TAG, "권한이 거부되어 스캔할 수 없음");
+            }
+        }
+    }
+
+    private void startBLEScan() {
+        if (bleManager != null && bleManager.hasPermissions()) {
+            Log.d(TAG, "BLE 스캔 시작");
+            bleManager.startScan();
+        } else {
+            Log.e(TAG, "스캔 권한 부족 또는 매니저 미초기화");
+        }
     }
 
     @Override

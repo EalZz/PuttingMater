@@ -176,10 +176,21 @@ void loop() {
       statusCharacteristic.writeValue("Ready");
     }
     if (resetCharacteristic.written()) {
-      String cmd = resetCharacteristic.value();
+      int len = resetCharacteristic.valueLength();
+      const uint8_t* val = resetCharacteristic.value();
+      String cmd = "";
+      for (int i = 0; i < len; i++) {
+        cmd += (char)val[i];
+      }
+
       if (cmd == "RESET") {
         Serial.println("앱에서 RESET 명령 수신!");
         resetAll();
+      } else if (cmd == "REBOOT") {
+        Serial.println("앱에서 REBOOT 명령 수신!");
+        statusCharacteristic.writeValue("Rebooting");
+        delay(50);
+        NVIC_SystemReset();
       }
     }
 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- Subtle gradient for realistic glass feel -->
+    <gradient
+        android:type="linear"
+        android:angle="315"
+        android:startColor="#1FFFFFFF"
+        android:endColor="#0DFFFFFF" />
+    <corners android:radius="20dp" />
+    <stroke
+        android:width="0.8dp"
+        android:color="#4DFFFFFF" />
+</shape>
