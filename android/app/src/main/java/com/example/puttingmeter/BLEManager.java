@@ -22,6 +22,10 @@ import androidx.core.content.ContextCompat;
 
 import java.util.UUID;
 
+import com.example.puttingmeter.ble.SpeedPayload;
+import com.example.puttingmeter.ble.SpeedPayloadParseResult;
+import com.example.puttingmeter.ble.SpeedPayloadParser;
+
 public class BLEManager {
 
     private static final String TAG = ">>>>";
@@ -209,34 +213,16 @@ public class BLEManager {
             Log.d(TAG, "Characteristic changed: " + characteristic.getUuid() + " | value: " + data);
 
             if (SPEED_UUID.equals(characteristic.getUuid().toString())) {
-                try {
-                    if (data.contains("|")) {
-                        String[] parts = data.split("\\|");
-                        if (parts.length == 2) {
-                            float peak = Float.parseFloat(parts[0]);
-                            float avg = Float.parseFloat(parts[1]);
-
-                            if (listener != null) {
-                                listener.onPeakSpeedReceived(String.valueOf(peak));
-                                listener.onAvgSpeedReceived(String.valueOf(avg));
-                            }
-                        }
-                        else {
-                            Log.e(TAG, "Invalid speed payload: " + data);
-                            if (listener != null) listener.onError("Invalid speed payload");
-                        }
+                SpeedPayloadParseResult result = SpeedPayloadParser.parse(data);
+                if (result.isSuccess()) {
+                    SpeedPayload payload = result.getPayload();
+                    if (listener != null) {
+                        listener.onPeakSpeedReceived(String.valueOf(payload.getPeakSpeed()));
+                        listener.onAvgSpeedReceived(String.valueOf(payload.getAvgSpeed()));
                     }
-                    else {
-                        float speed = Float.parseFloat(data);
-                        if (listener != null) {
-                            listener.onPeakSpeedReceived(String.valueOf(speed));
-                            listener.onAvgSpeedReceived(String.valueOf(speed));
-                        }
-                        Log.d(TAG, "Single speed value received: " + speed);
-                    }
-                } catch (NumberFormatException e) {
-                    Log.e(TAG, "Invalid numeric speed payload: " + data, e);
-                    if (listener != null) listener.onError("Invalid numeric speed payload: " + data);
+                } else {
+                    Log.e(TAG, "Payload parsing failed: " + result.getError());
+                    if (listener != null) listener.onError(result.getError());
                 }
             }
         }

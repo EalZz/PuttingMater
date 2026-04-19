@@ -21,6 +21,11 @@ import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.puttingmeter.model.PuttingRecord;
+import com.example.puttingmeter.format.SpeedUnit;
+import com.example.puttingmeter.format.SpeedFormatter;
+import com.example.puttingmeter.session.PuttingSession;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,18 +41,18 @@ public class MainActivity extends AppCompatActivity {
     private TextView connectionText, speedValue, speedUnitText, distanceValue, correctionText;
     private TextView avgSpeedValue, avgSpeedUnitText;
     private View layoutHome, layoutHistory, layoutSettings;
-    private float maxDistanceThisSession = 0f;
+
+    private final PuttingSession puttingSession = new PuttingSession();
 
     private RecyclerView recordsRecyclerView;
     private RecordAdapter recordAdapter;
-    private final List<PuttingRecord> recordList = new ArrayList<>();
 
     private Button btnReset, btnSettings, btnReconnect;
     private SeekBar correctionSeekBar;
     private Spinner unitSpinner;
 
     private int correctionStep = 5; // 기본값 5 (1-10 범위)
-    private String speedUnit = "cm/s";
+    private SpeedUnit speedUnit = SpeedUnit.CM_PER_SEC;
     private float lastPeakSpeed = 0f;
     private float lastAvgSpeed = 0f;
 
@@ -97,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         recordsRecyclerView = findViewById(R.id.recordsRecyclerView);
-        recordAdapter = new RecordAdapter(recordList);
+        recordAdapter = new RecordAdapter(puttingSession.getRecordList());
         if (recordsRecyclerView != null) {
             recordsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
             recordsRecyclerView.setAdapter(recordAdapter);
@@ -145,9 +150,8 @@ public class MainActivity extends AppCompatActivity {
             btnReset.setOnClickListener(v -> {
                 if (bleManager.isConnected()) {
                     bleManager.sendResetCommand();
-                    recordList.clear();
+                    puttingSession.clear();
                     recordAdapter.notifyDataSetChanged();
-                    maxDistanceThisSession = 0f;
                     resetUIValues();
                 } else startBLEScanAction();
             });
@@ -159,10 +163,10 @@ public class MainActivity extends AppCompatActivity {
         checkAndRequestPermissions();
 
         // 초기 설정
-        speedUnit = "cm/s";
-        if (speedUnitText != null) speedUnitText.setText(speedUnit);
-        if (avgSpeedUnitText != null) avgSpeedUnitText.setText(speedUnit);
-        if (recordAdapter != null) recordAdapter.setSpeedUnit(speedUnit);
+        speedUnit = SpeedUnit.CM_PER_SEC;
+        if (speedUnitText != null) speedUnitText.setText(speedUnit.getDisplayName());
+        if (avgSpeedUnitText != null) avgSpeedUnitText.setText(speedUnit.getDisplayName());
+        if (recordAdapter != null) recordAdapter.setSpeedUnit(speedUnit.getDisplayName());
         updateCorrectionText(correctionStep);
     }
 
@@ -209,14 +213,10 @@ public class MainActivity extends AppCompatActivity {
     private void handleSpeedData(String data, boolean isAverage) {
         try {
             float rawSpeed = Float.parseFloat(data); // mm/s
-            float displaySpeed = rawSpeed;
-            switch (speedUnit) {
-                case "cm/s": displaySpeed /= 10f; break;
-                case "m/s":  displaySpeed /= 1000f; break;
-            }
+            String displaySpeedStr = SpeedFormatter.formatValue(rawSpeed, speedUnit);
 
             if (isAverage) {
-                avgSpeedValue.setText(String.format("%.1f", displaySpeed));
+                avgSpeedValue.setText(displaySpeedStr);
                 lastAvgSpeed = rawSpeed;
 
                 double distance = PuttingDistanceCalculator.calculateDistance(lastAvgSpeed, correctionStep);
@@ -224,8 +224,7 @@ public class MainActivity extends AppCompatActivity {
                 distanceValue.setText(String.format("%.1f", fDistance));
 
                 // 최고 기록(Jackpot) 연출
-                if (fDistance > maxDistanceThisSession && fDistance > 0.1f) {
-                    maxDistanceThisSession = fDistance;
+                if (puttingSession.isNewBest(fDistance)) {
                     distanceValue.setTextColor(getResources().getColor(R.color.jackpot_gold));
                     // 햅틱 피드백 추가 가능
                 } else {
@@ -234,11 +233,10 @@ public class MainActivity extends AppCompatActivity {
 
                 // 기록 추가
                 String now = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
-                recordList.add(0, new PuttingRecord(now, lastPeakSpeed, lastAvgSpeed, fDistance));
-                if (recordList.size() > 10) recordList.remove(recordList.size() - 1);
+                puttingSession.addRecord(new PuttingRecord(now, lastPeakSpeed, lastAvgSpeed, fDistance));
                 recordAdapter.notifyDataSetChanged();
             } else {
-                speedValue.setText(String.format("%.1f", displaySpeed));
+                speedValue.setText(displaySpeedStr);
                 lastPeakSpeed = rawSpeed;
             }
             startResetTimer();
@@ -276,7 +274,7 @@ public class MainActivity extends AppCompatActivity {
         }
         
         // 현재 단위 표시
-        currentUnitText.setText(speedUnit);
+        currentUnitText.setText(speedUnit.getDisplayName());
 
         correctionSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -320,10 +318,11 @@ public class MainActivity extends AppCompatActivity {
         if (currentIndex >= 0) unitSpinner.setSelection(currentIndex);
 
         btnSave.setOnClickListener(v -> {
-            speedUnit = unitSpinner.getSelectedItem().toString();
-            speedUnitText.setText(speedUnit);
-            avgSpeedUnitText.setText(speedUnit);
-            recordAdapter.setSpeedUnit(speedUnit);
+            String selectedUnitStr = unitSpinner.getSelectedItem().toString();
+            speedUnit = SpeedUnit.fromString(selectedUnitStr);
+            speedUnitText.setText(speedUnit.getDisplayName());
+            avgSpeedUnitText.setText(speedUnit.getDisplayName());
+            recordAdapter.setSpeedUnit(speedUnit.getDisplayName());
 
             // 비거리 재계산 (정수 표기)
             if (lastAvgSpeed > 0) {
@@ -409,23 +408,4 @@ public class MainActivity extends AppCompatActivity {
         correctionText.setTextColor(0xFF666666);
     }
 
-    // -------------------- PuttingRecord --------------------
-    public static class PuttingRecord {
-        private final String time;
-        private final float peakSpeed;
-        private final float avgSpeed;
-        private final float distance;
-
-        public PuttingRecord(String time, float peakSpeed, float avgSpeed, float distance) {
-            this.time = time;
-            this.peakSpeed = peakSpeed;
-            this.avgSpeed = avgSpeed;
-            this.distance = distance;
-        }
-
-        public String getTime() { return time; }
-        public float getPeakSpeed() { return peakSpeed; }
-        public float getAvgSpeed() { return avgSpeed; }
-        public float getDistance() { return distance; }
-    }
 }

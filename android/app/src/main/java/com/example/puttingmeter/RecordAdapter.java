@@ -11,17 +11,21 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 import java.util.Locale;
 
+import com.example.puttingmeter.model.PuttingRecord;
+import com.example.puttingmeter.format.SpeedUnit;
+import com.example.puttingmeter.format.SpeedFormatter;
+
 public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.RecordViewHolder> {
 
-    private final List<MainActivity.PuttingRecord> recordList;
-    private String speedUnit = "mm/s";
+    private final List<PuttingRecord> recordList;
+    private SpeedUnit speedUnit = SpeedUnit.MM_PER_SEC;
 
-    public RecordAdapter(List<MainActivity.PuttingRecord> recordList) {
+    public RecordAdapter(List<PuttingRecord> recordList) {
         this.recordList = recordList;
     }
 
-    public void setSpeedUnit(String unit) {
-        this.speedUnit = unit;
+    public void setSpeedUnit(String unitStr) {
+        this.speedUnit = SpeedUnit.fromString(unitStr);
         notifyDataSetChanged();
     }
 
@@ -35,18 +39,14 @@ public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.RecordView
 
     @Override
     public void onBindViewHolder(@NonNull RecordViewHolder holder, int position) {
-        MainActivity.PuttingRecord record = recordList.get(position);
+        PuttingRecord record = recordList.get(position);
 
-        // 피크 속도 변환
-        float displayPeak = record.getPeakSpeed();
-        float displayAvg  = record.getAvgSpeed();
-        switch (speedUnit) {
-            case "cm/s": displayPeak /= 10f; displayAvg /= 10f; break;
-            case "m/s":  displayPeak /= 1000f; displayAvg /= 1000f; break;
-        }
+        String peakStr = SpeedFormatter.formatValue(record.getPeakSpeed(), speedUnit);
+        String avgStr = SpeedFormatter.formatValue(record.getAvgSpeed(), speedUnit);
+        String unitName = speedUnit.getDisplayName();
 
-        holder.speedText.setText(String.format("피크 %.1f %s", displayPeak, speedUnit));
-        holder.avgSpeedText.setText(String.format("평균 %.1f %s", displayAvg, speedUnit));
+        holder.speedText.setText(String.format("피크 %s %s", peakStr, unitName));
+        holder.avgSpeedText.setText(String.format("평균 %s %s", avgStr, unitName));
         
         holder.distanceText.setText(String.format(Locale.getDefault(), "→ %.1f m", record.getDistance()));
         
