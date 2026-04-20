@@ -25,6 +25,7 @@ import com.example.puttingmeter.model.PuttingRecord;
 import com.example.puttingmeter.format.SpeedUnit;
 import com.example.puttingmeter.format.SpeedFormatter;
 import com.example.puttingmeter.session.PuttingSession;
+import com.example.puttingmeter.settings.PuttingSettings;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -51,8 +52,7 @@ public class MainActivity extends AppCompatActivity {
     private SeekBar correctionSeekBar;
     private Spinner unitSpinner;
 
-    private int correctionStep = 5; // 기본값 5 (1-10 범위)
-    private SpeedUnit speedUnit = SpeedUnit.CM_PER_SEC;
+    private final PuttingSettings puttingSettings = new PuttingSettings();
     private float lastPeakSpeed = 0f;
     private float lastAvgSpeed = 0f;
 
@@ -163,11 +163,11 @@ public class MainActivity extends AppCompatActivity {
         checkAndRequestPermissions();
 
         // 초기 설정
-        speedUnit = SpeedUnit.CM_PER_SEC;
-        if (speedUnitText != null) speedUnitText.setText(speedUnit.getDisplayName());
-        if (avgSpeedUnitText != null) avgSpeedUnitText.setText(speedUnit.getDisplayName());
-        if (recordAdapter != null) recordAdapter.setSpeedUnit(speedUnit.getDisplayName());
-        updateCorrectionText(correctionStep);
+        puttingSettings.setSpeedUnit(SpeedUnit.CM_PER_SEC);
+        if (speedUnitText != null) speedUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
+        if (avgSpeedUnitText != null) avgSpeedUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
+        if (recordAdapter != null) recordAdapter.setSpeedUnit(puttingSettings.getSpeedUnit().getDisplayName());
+        updateCorrectionText(puttingSettings.getCorrectionStep());
     }
 
     private void startBLEScanAction() {
@@ -213,13 +213,14 @@ public class MainActivity extends AppCompatActivity {
     private void handleSpeedData(String data, boolean isAverage) {
         try {
             float rawSpeed = Float.parseFloat(data); // mm/s
-            String displaySpeedStr = SpeedFormatter.formatValue(rawSpeed, speedUnit);
+            String displaySpeedStr = SpeedFormatter.formatValue(rawSpeed, puttingSettings.getSpeedUnit());
 
             if (isAverage) {
                 avgSpeedValue.setText(displaySpeedStr);
                 lastAvgSpeed = rawSpeed;
 
-                double distance = PuttingDistanceCalculator.calculateDistance(lastAvgSpeed, correctionStep);
+                double distance = PuttingDistanceCalculator.calculateDistance(
+                        lastAvgSpeed, puttingSettings.getCorrectionStep());
                 float fDistance = (float) distance;
                 distanceValue.setText(String.format("%.1f", fDistance));
 
@@ -266,25 +267,26 @@ public class MainActivity extends AppCompatActivity {
         // 보정 단계 설정 (1-10)
         correctionSeekBar.setMin(1);
         correctionSeekBar.setMax(10);
-        correctionSeekBar.setProgress(correctionStep);
-        tvCorrection.setText(String.valueOf(correctionStep));
+        correctionSeekBar.setProgress(puttingSettings.getCorrectionStep());
+        tvCorrection.setText(String.valueOf(puttingSettings.getCorrectionStep()));
         if (tvGreenSpeed != null) {
-            tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(correctionStep));
+            tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(puttingSettings.getCorrectionStep()));
             tvGreenSpeed.setTextColor(0xFF2E7D32); // 녹색
         }
         
         // 현재 단위 표시
-        currentUnitText.setText(speedUnit.getDisplayName());
+        currentUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
 
         correctionSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
-                    correctionStep = progress;
-                    tvCorrection.setText(String.valueOf(correctionStep));
-                    updateCorrectionText(correctionStep);
+                    puttingSettings.setCorrectionStep(progress);
+                    tvCorrection.setText(String.valueOf(puttingSettings.getCorrectionStep()));
+                    updateCorrectionText(puttingSettings.getCorrectionStep());
                     if (tvGreenSpeed != null) {
-                        tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(correctionStep));
+                        tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(
+                                puttingSettings.getCorrectionStep()));
                     }
                 }
             }
@@ -297,11 +299,12 @@ public class MainActivity extends AppCompatActivity {
             int next = Math.max(1, Math.min(10, correctionSeekBar.getProgress() + delta));
             if (next != correctionSeekBar.getProgress()) {
                 correctionSeekBar.setProgress(next);
-                correctionStep = next;
-                tvCorrection.setText(String.valueOf(correctionStep));
-                updateCorrectionText(correctionStep);
+                puttingSettings.setCorrectionStep(next);
+                tvCorrection.setText(String.valueOf(puttingSettings.getCorrectionStep()));
+                updateCorrectionText(puttingSettings.getCorrectionStep());
                 if (tvGreenSpeed != null) {
-                    tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(correctionStep));
+                    tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(
+                            puttingSettings.getCorrectionStep()));
                 }
             }
         };
@@ -314,19 +317,20 @@ public class MainActivity extends AppCompatActivity {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         unitSpinner.setAdapter(adapter);
 
-        int currentIndex = Arrays.asList(units).indexOf(speedUnit);
+        int currentIndex = Arrays.asList(units).indexOf(puttingSettings.getSpeedUnit().getDisplayName());
         if (currentIndex >= 0) unitSpinner.setSelection(currentIndex);
 
         btnSave.setOnClickListener(v -> {
             String selectedUnitStr = unitSpinner.getSelectedItem().toString();
-            speedUnit = SpeedUnit.fromString(selectedUnitStr);
-            speedUnitText.setText(speedUnit.getDisplayName());
-            avgSpeedUnitText.setText(speedUnit.getDisplayName());
-            recordAdapter.setSpeedUnit(speedUnit.getDisplayName());
+            puttingSettings.setSpeedUnit(SpeedUnit.fromString(selectedUnitStr));
+            speedUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
+            avgSpeedUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
+            recordAdapter.setSpeedUnit(puttingSettings.getSpeedUnit().getDisplayName());
 
             // 비거리 재계산 (정수 표기)
             if (lastAvgSpeed > 0) {
-                double distance = PuttingDistanceCalculator.calculateDistance(lastAvgSpeed, correctionStep);
+                double distance = PuttingDistanceCalculator.calculateDistance(
+                        lastAvgSpeed, puttingSettings.getCorrectionStep());
                 distanceValue.setText(String.format(Locale.getDefault(), "%.1f", distance));
             }
 
