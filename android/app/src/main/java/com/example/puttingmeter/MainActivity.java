@@ -164,10 +164,8 @@ public class MainActivity extends AppCompatActivity {
 
         // 초기 설정
         puttingSettings.setSpeedUnit(SpeedUnit.CM_PER_SEC);
-        if (speedUnitText != null) speedUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
-        if (avgSpeedUnitText != null) avgSpeedUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
-        if (recordAdapter != null) recordAdapter.setSpeedUnit(puttingSettings.getSpeedUnit().getDisplayName());
-        updateCorrectionText(puttingSettings.getCorrectionStep());
+        applyUnitSettings();
+        applyCorrectionSettings();
     }
 
     private void startBLEScanAction() {
@@ -245,6 +243,27 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "속도 변환 오류", e);
         }
     }
+
+    private void recalculateDistance() {
+        if (lastAvgSpeed > 0) {
+            double distance = PuttingDistanceCalculator.calculateDistance(
+                    lastAvgSpeed, puttingSettings.getCorrectionStep());
+            distanceValue.setText(String.format(Locale.getDefault(), "%.1f", (float) distance));
+        }
+    }
+
+    private void applyUnitSettings() {
+        String unitName = puttingSettings.getSpeedUnit().getDisplayName();
+        if (speedUnitText != null) speedUnitText.setText(unitName);
+        if (avgSpeedUnitText != null) avgSpeedUnitText.setText(unitName);
+        if (recordAdapter != null) recordAdapter.setSpeedUnit(unitName);
+        recalculateDistance();
+    }
+
+    private void applyCorrectionSettings() {
+        updateCorrectionText(puttingSettings.getCorrectionStep());
+        recalculateDistance();
+    }
     // ... 나머지 기존 메서드들 유지 (showSettingsDialog 등) ...
 
 
@@ -283,7 +302,7 @@ public class MainActivity extends AppCompatActivity {
                 if (fromUser) {
                     puttingSettings.setCorrectionStep(progress);
                     tvCorrection.setText(String.valueOf(puttingSettings.getCorrectionStep()));
-                    updateCorrectionText(puttingSettings.getCorrectionStep());
+                    applyCorrectionSettings();
                     if (tvGreenSpeed != null) {
                         tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(
                                 puttingSettings.getCorrectionStep()));
@@ -301,7 +320,7 @@ public class MainActivity extends AppCompatActivity {
                 correctionSeekBar.setProgress(next);
                 puttingSettings.setCorrectionStep(next);
                 tvCorrection.setText(String.valueOf(puttingSettings.getCorrectionStep()));
-                updateCorrectionText(puttingSettings.getCorrectionStep());
+                applyCorrectionSettings();
                 if (tvGreenSpeed != null) {
                     tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(
                             puttingSettings.getCorrectionStep()));
@@ -323,17 +342,7 @@ public class MainActivity extends AppCompatActivity {
         btnSave.setOnClickListener(v -> {
             String selectedUnitStr = unitSpinner.getSelectedItem().toString();
             puttingSettings.setSpeedUnit(SpeedUnit.fromString(selectedUnitStr));
-            speedUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
-            avgSpeedUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
-            recordAdapter.setSpeedUnit(puttingSettings.getSpeedUnit().getDisplayName());
-
-            // 비거리 재계산 (정수 표기)
-            if (lastAvgSpeed > 0) {
-                double distance = PuttingDistanceCalculator.calculateDistance(
-                        lastAvgSpeed, puttingSettings.getCorrectionStep());
-                distanceValue.setText(String.format(Locale.getDefault(), "%.1f", distance));
-            }
-
+            applyUnitSettings();
             dialog.dismiss();
         });
         btnCancel.setOnClickListener(v -> dialog.dismiss());
