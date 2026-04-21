@@ -8,14 +8,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.SeekBar;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -26,12 +22,10 @@ import com.example.puttingmeter.format.SpeedUnit;
 import com.example.puttingmeter.format.SpeedFormatter;
 import com.example.puttingmeter.session.PuttingSession;
 import com.example.puttingmeter.settings.PuttingSettings;
+import com.example.puttingmeter.settings.SettingsDialogController;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
@@ -49,8 +43,6 @@ public class MainActivity extends AppCompatActivity {
     private RecordAdapter recordAdapter;
 
     private Button btnReset, btnSettings, btnReconnect;
-    private SeekBar correctionSeekBar;
-    private Spinner unitSpinner;
 
     private final PuttingSettings puttingSettings = new PuttingSettings();
     private float lastPeakSpeed = 0f;
@@ -268,84 +260,18 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void showSettingsDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setView(R.layout.dialog_settings);
-        AlertDialog dialog = builder.create();
-        dialog.show();
-
-        correctionSeekBar = dialog.findViewById(R.id.greenSpeedSeekBar); // 기존 seekbar 재사용
-        TextView tvCorrection = dialog.findViewById(R.id.currentGreenSpeedText);
-        TextView tvGreenSpeed = dialog.findViewById(R.id.currentGreenSpeedValue);
-        TextView currentUnitText = dialog.findViewById(R.id.currentUnitText);
-        unitSpinner = dialog.findViewById(R.id.unitSpinner);
-        Button btnSave = dialog.findViewById(R.id.btnSave);
-        Button btnCancel = dialog.findViewById(R.id.btnCancel);
-        Button btnDecreaseStep = dialog.findViewById(R.id.btnDecreaseStep);
-        Button btnIncreaseStep = dialog.findViewById(R.id.btnIncreaseStep);
-
-        // 보정 단계 설정 (1-10)
-        correctionSeekBar.setMin(1);
-        correctionSeekBar.setMax(10);
-        correctionSeekBar.setProgress(puttingSettings.getCorrectionStep());
-        tvCorrection.setText(String.valueOf(puttingSettings.getCorrectionStep()));
-        if (tvGreenSpeed != null) {
-            tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(puttingSettings.getCorrectionStep()));
-            tvGreenSpeed.setTextColor(0xFF2E7D32); // 녹색
-        }
-        
-        // 현재 단위 표시
-        currentUnitText.setText(puttingSettings.getSpeedUnit().getDisplayName());
-
-        correctionSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        SettingsDialogController controller = new SettingsDialogController();
+        controller.show(this, puttingSettings, new SettingsDialogController.OnSettingsChangeListener() {
             @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) {
-                    puttingSettings.setCorrectionStep(progress);
-                    tvCorrection.setText(String.valueOf(puttingSettings.getCorrectionStep()));
-                    applyCorrectionSettings();
-                    if (tvGreenSpeed != null) {
-                        tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(
-                                puttingSettings.getCorrectionStep()));
-                    }
-                }
+            public void onUnitChanged() {
+                applyUnitSettings();
             }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
 
-        View.OnClickListener stepClick = v -> {
-            int delta = (v.getId() == R.id.btnIncreaseStep) ? 1 : -1;
-            int next = Math.max(1, Math.min(10, correctionSeekBar.getProgress() + delta));
-            if (next != correctionSeekBar.getProgress()) {
-                correctionSeekBar.setProgress(next);
-                puttingSettings.setCorrectionStep(next);
-                tvCorrection.setText(String.valueOf(puttingSettings.getCorrectionStep()));
+            @Override
+            public void onCorrectionStepChanged() {
                 applyCorrectionSettings();
-                if (tvGreenSpeed != null) {
-                    tvGreenSpeed.setText(PuttingDistanceCalculator.getGreenSpeedText(
-                            puttingSettings.getCorrectionStep()));
-                }
             }
-        };
-        if (btnDecreaseStep != null) btnDecreaseStep.setOnClickListener(stepClick);
-        if (btnIncreaseStep != null) btnIncreaseStep.setOnClickListener(stepClick);
-
-        String[] units = {"mm/s", "cm/s", "m/s"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_item, units);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        unitSpinner.setAdapter(adapter);
-
-        int currentIndex = Arrays.asList(units).indexOf(puttingSettings.getSpeedUnit().getDisplayName());
-        if (currentIndex >= 0) unitSpinner.setSelection(currentIndex);
-
-        btnSave.setOnClickListener(v -> {
-            String selectedUnitStr = unitSpinner.getSelectedItem().toString();
-            puttingSettings.setSpeedUnit(SpeedUnit.fromString(selectedUnitStr));
-            applyUnitSettings();
-            dialog.dismiss();
         });
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
     }
 
     private void checkAndRequestPermissions() {

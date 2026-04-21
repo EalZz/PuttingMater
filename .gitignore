@@ -1,5 +1,6 @@
 .android/
 .gradle/
 tmp/
-REFACTORING_PLAN.md
-REFACTORING_PHASE_0_6A_REPORT.md
+*.md
+!README.md
+!**/README.md
