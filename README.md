@@ -17,14 +17,12 @@ Arduino 보드는 IMU 센서로 퍼팅 동작을 감지하고 BLE로 속도 데�
 
 ## 화면 구성
 
-아래 이미지는 앱의 주요 화면입니다. 스크린샷 파일은 `docs/screenshots/` 아래에 배치하면 GitHub README에서 바로 렌더링됩니다.
+아래 이미지는 앱의 주요 화면입니다. 스크린샷 파일을 `docs/screenshots/` 아래에 커밋해두면 GitHub README에서 바로 렌더링됩니다(파일이 없으면 이미지가 깨져 보입니다).
 
-| 화면 | 스크린샷 | 설명 |
-| --- | --- | --- |
-| 메인 화면 | ![메인 화면](docs/screenshots/home.png) | BLE 연결 상태, 예상 비거리, 피크 속도, 평균 속도를 표시합니다. |
-| 기록 화면 | ![기록 화면](docs/screenshots/history.png) | 최근 퍼팅 기록의 피크 속도, 평균 속도, 비거리, 시간을 표시합니다. |
-| 설정 화면 | ![설정 화면](docs/screenshots/settings.png) | 보정 설정 진입, 데이터 초기화, 기기 재연결 기능을 제공합니다. |
-| 그린스피드 설정 화면 | ![그린스피드 설정 화면](docs/screenshots/green-speed-settings.png) | 보정 단계와 속도 단위를 설정하고 저장/취소할 수 있습니다. |
+| 메인화면 | 기록화면 | 설정화면 | 그린스피드 설정화면 |
+| --- | --- | --- | --- |
+| <img src="docs/screenshots/home.png" width="220" /> | <img src="docs/screenshots/history.png" width="220" /> | <img src="docs/screenshots/settings.png" width="220" /> | <img src="docs/screenshots/green-speed-settings.png" width="220" /> |
+| BLE 연결 상태, 예상 비거리, 피크/평균 속도 표시 | 최근 퍼팅 기록의 피크/평균 속도, 비거리, 시간 표시 | 보정 설정 진입, 데이터 초기화, 기기 재연결 | 보정 단계와 속도 단위 설정 및 저장/취소 |
 
 ## 프로젝트 구조
 
