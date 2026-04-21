@@ -21,7 +21,7 @@ Arduino 보드는 IMU 센서로 퍼팅 동작을 감지하고 BLE로 속도 데�
 
 | 메인화면 | 기록화면 | 설정화면 | 그린스피드 설정화면 |
 | --- | --- | --- | --- |
-| <img src="docs/screenshots/home.jpg" width="220" /> | <img src="docs/screenshots/history.jpg" width="220" /> | <img src="docs/screenshots/settings.jpg" width="220" /> | <img src="docs/screenshots/green-speed-settings.jpg" width="220" /> |
+| <img src="docs/screenshots/home.jpg" width="220" /> | <img src="docs/screenshots/history.jpg" width="220" /> | <img src="docs/screenshots/setting.jpg" width="220" /> | <img src="docs/screenshots/green-speed-settings.jpg" width="220" /> |
 | BLE 연결 상태, 예상 비거리, 피크/평균 속도 표시 | 최근 퍼팅 기록의 피크/평균 속도, 비거리, 시간 표시 | 보정 설정 진입, 데이터 초기화, 기기 재연결 | 보정 단계와 속도 단위 설정 및 저장/취소 |
 
 ## 프로젝트 구조
